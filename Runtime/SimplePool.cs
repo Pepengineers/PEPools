@@ -13,8 +13,8 @@ namespace PEPEngineers.PEPools.Runtime
 			int bucketSize = PoolConstants.DefaultBucketSize,
 			int maxSize = PoolConstants.DefaultMaxSize)
 		{
-			createFactory = factory;
-			pool = new Pool<TItem>(this, this);
+			createFactory = factory ?? throw new ArgumentNullException(nameof(factory));
+			pool = new Pool<TItem>(this, this, defaultCapacity, bucketSize, maxSize);
 		}
 
 		public Action<TItem> ItemCreated { get; set; } = null;

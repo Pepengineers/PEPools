@@ -3,9 +3,6 @@ using System.Collections.Generic;
 using PEPEngineers.PEPools.Interfaces;
 using PEPEngineers.PEPools.Extensions;
 using PEPEngineers.PEPools.Settings;
-#if UNITY_EDITOR
-using UnityEngine.Assertions;
-#endif
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
 #endif
@@ -25,10 +22,9 @@ namespace PEPEngineers.PEPools.Runtime
 			int bucketSize = PoolConstants.DefaultBucketSize,
 			int maxSize = PoolConstants.DefaultMaxSize)
 		{
-#if UNITY_EDITOR
-			Assert.IsFalse(maxSize <= 0);
-			Assert.IsNotNull(factory);
-#endif
+			if (factory == null) throw new ArgumentNullException(nameof(factory));
+			if (bucketSize <= 0) throw new ArgumentOutOfRangeException(nameof(bucketSize));
+			if (maxSize <= 0) throw new ArgumentOutOfRangeException(nameof(maxSize));
 			Items = new List<T>(defaultCapacity);
 			this.factory = factory;
 			this.callbacks = callbacks;
@@ -71,8 +67,8 @@ namespace PEPEngineers.PEPools.Runtime
 			if (FreeCount == 0) CreateBucket();
 
 			var item = Items[0];
-			callbacks?.OnItemRented(item);
 			Items.FastRemove(0);
+			callbacks?.OnItemRented(item);
 
 			return item;
 		}
@@ -88,8 +84,9 @@ namespace PEPEngineers.PEPools.Runtime
 			callbacks?.OnItemReleased(element);
 			if (FreeCount >= MaxCount)
 			{
-				callbacks?.OnItemDestroyed(element);
-				factory.Destroy(element);
+				countAll--;
+				try { callbacks?.OnItemDestroyed(element); }
+				finally { factory.Destroy(element); }
 			}
 			else
 			{
@@ -99,15 +96,15 @@ namespace PEPEngineers.PEPools.Runtime
 
 		public void Clear()
 		{
-			var count = Items.Count;
-			while (count-- > 0)
+			while (Items.Count > 0)
 			{
-				callbacks?.OnItemDestroyed(Items[count]);
-				factory.Destroy(Items[count]);
+				var index = Items.Count - 1;
+				var item = Items[index];
+				Items.RemoveAt(index);
+				countAll--;
+				try { callbacks?.OnItemDestroyed(item); }
+				finally { factory.Destroy(item); }
 			}
-
-			Items.Clear();
-			countAll = 0;
 		}
 
 		private void CreateBucket()
@@ -117,9 +114,8 @@ namespace PEPEngineers.PEPools.Runtime
 				var item = factory.Create();
 				callbacks?.OnItemCreated(item);
 				Items.Add(item);
+				countAll++;
 			}
-
-			countAll += BucketSize;
 		}
 	}
 }
