@@ -68,7 +68,14 @@ namespace PEPEngineers.PEPools.Runtime
 
 			var item = Items[0];
 			Items.FastRemove(0);
-			callbacks?.OnItemRented(item);
+			try { callbacks?.OnItemRented(item); }
+			catch
+			{
+				countAll--;
+				try { callbacks?.OnItemDestroyed(item); }
+				finally { factory.Destroy(item); }
+				throw;
+			}
 
 			return item;
 		}
@@ -112,7 +119,13 @@ namespace PEPEngineers.PEPools.Runtime
 			for (var i = 0; i < BucketSize; i++)
 			{
 				var item = factory.Create();
-				callbacks?.OnItemCreated(item);
+				try { callbacks?.OnItemCreated(item); }
+				catch
+				{
+					try { callbacks?.OnItemDestroyed(item); }
+					finally { factory.Destroy(item); }
+					throw;
+				}
 				Items.Add(item);
 				countAll++;
 			}

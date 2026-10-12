@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using NUnit.Framework;
+using PEPEngineers.PEPools.Interfaces;
 using PEPEngineers.PEPools.Runtime;
 
 namespace PEPEngineers.PEPools.Tests
@@ -74,6 +76,51 @@ namespace PEPEngineers.PEPools.Tests
 			Assert.AreEqual(pool.MaxCount * 2, factory.CreatedCount);
 			Assert.AreEqual(pool.MaxCount * 2, factory.ReleasedCount);
 			Assert.AreEqual(pool.MaxCount, factory.DestroyedCount);
+		}
+
+		[TestCase(true)]
+		[TestCase(false)]
+		public void FailedCallbackDestroysItemThatWasNotReturned(bool failCreation)
+		{
+			var failingFactory = new FailingFactory { FailCreation = failCreation, FailRental = !failCreation };
+			var failingPool = new Pool<object>(failingFactory, failingFactory, bucketSize: 1);
+
+			Assert.Throws<InvalidOperationException>(() => failingPool.Get());
+			Assert.AreEqual(1, failingFactory.DestroyedCount);
+			Assert.AreEqual(1, failingFactory.DestroyedCallbackCount);
+			Assert.AreEqual(0, failingPool.FreeCount);
+			Assert.AreEqual(0, failingPool.RentedCount);
+
+			failingFactory.FailCreation = failingFactory.FailRental = false;
+			var item = failingPool.Get();
+			Assert.NotNull(item);
+			Assert.AreEqual(1, failingPool.RentedCount);
+			failingPool.Release(item);
+			failingPool.Clear();
+			Assert.AreEqual(2, failingFactory.DestroyedCount);
+			Assert.AreEqual(2, failingFactory.DestroyedCallbackCount);
+			Assert.AreEqual(0, failingPool.RentedCount);
+		}
+
+		private sealed class FailingFactory : IPoolFactory<object>, IPoolCallback<object>
+		{
+			public bool FailCreation;
+			public bool FailRental;
+			public int DestroyedCount;
+			public int DestroyedCallbackCount;
+
+			public object Create() => new object();
+			public void Destroy(object item) => DestroyedCount++;
+			public void OnItemCreated(in object item)
+			{
+				if (FailCreation) throw new InvalidOperationException("Creation callback failed.");
+			}
+			public void OnItemRented(in object item)
+			{
+				if (FailRental) throw new InvalidOperationException("Rental callback failed.");
+			}
+			public void OnItemReleased(in object item) { }
+			public void OnItemDestroyed(in object item) => DestroyedCallbackCount++;
 		}
 	}
 }

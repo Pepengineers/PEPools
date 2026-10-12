@@ -7,9 +7,7 @@
     "PEPEngineers.PEPools"
   ],
   "includePlatforms": [
-    "Editor",
-    "WindowsStandalone32",
-    "WindowsStandalone64"
+    "Editor"
   ],
   "excludePlatforms": [],
   "allowUnsafeCode": false,
